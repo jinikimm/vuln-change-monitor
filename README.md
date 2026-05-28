@@ -1,83 +1,51 @@
 # Vulnerability Monitor Service
 
-## Operating Model
-
-```mermaid
-flowchart LR
-  C[Client] --> S[Service API]
-  S --> Q[(In-memory Queue)]
-  Q --> W1[Worker 1]
-  Q --> W2[Worker 2]
-  Q --> Wn[Worker N]
-
-  S --> DB[(DB: vulnerabilities/files)]
-  S --> FS[(Filesystem: temp files)]
-
-  W1 --> DB
-  W2 --> DB
-  Wn --> DB
-
-  W1 --> FS
-  W2 --> FS
-  Wn --> FS
-```
-
-The service receives requests, stores job state in the database, and enqueues vulnerability analysis jobs in an in-memory queue.
-Workers consume tasks concurrently from the queue, write results to the database, and use the temporary filesystem.
 
 ## Architecture
 
 ```mermaid
 flowchart TD
-  Client[Client]
-  API[Flask API]
-  Q[(In-memory Queue)]
-  W[ThreadPool Worker]
-  VS[VulnerabilityService]
-  DB[(PostgreSQL)]
-  FS[(Temp Filesystem)]
+    Client[Client]
+    FlaskAPI[Flask API]
+    VulnerabilityService[VulnerabilityService]
+    Database[(PostgreSQL)]
 
-  Client --> API
-  API --> DB
-  API --> Q
-
-  Q --> W
-
-  W --> VS
-  VS --> DB
-  VS --> FS
+    Client --> FlaskAPI
+    FlaskAPI --> VulnerabilityService
+    VulnerabilityService --> Database
 ```
+
+The service receives HTTP requests (mainly vulnerability snapshot submissions and queries) via a Flask API. All validation, comparison, and database operations are handled synchronously in the API and service layer.
 
 ### Key Points
 
-- The queue is used as a trigger for background jobs.
-- Each vulnerability analysis job is enqueued once and fully processed in a single worker flow.
-- The analysis logic is centralized in `VulnerabilityService`.
+- All logic is handled synchronously in the Flask API and service layer.
+- No background queue, thread pool, or worker process is used.
+- The `VulnerabilityService` handles validation, deduplication, snapshot comparison, and DB writes.
 
-## Vulnerability Analysis Request Flow
+## Vulnerability Snapshot Submission Flow
 
 ```mermaid
 sequenceDiagram
-  participant C as Client
-  participant API as /vulnerabilities
-  participant DB as vulnerabilities/files
-  participant Q as Queue
-  participant W as Worker
-  participant VS as VulnerabilityService
+    participant C as Client
+    participant API as Flask API
+    participant S as VulnerabilityService
+    participant DB as Database
 
-  C->>API: POST /vulnerabilities (file, options)
-  API->>VS: save_file()
-  API->>DB: create VulnerabilityJob(status=pending)
-  API->>Q: enqueue vulnerability analysis task (once)
-  API-->>C: 202 {job_id}
-
-  Q->>W: consume task
-  W->>VS: analyze_task(job_id, file_path, options)
-  VS->>DB: status -> running
-  VS->>VS: analyze_vulnerabilities()
-  VS->>DB: insert results
-  VS->>DB: status -> completed
+    C->>API: POST /snapshots (snapshot data)
+    API->>S: validate & process snapshot
+    S->>DB: store snapshot & findings
+    S->>DB: compare with previous snapshot
+    API-->>C: 201 Created / result
 ```
+
+### Flow Details
+
+- Client submits a vulnerability snapshot via HTTP POST.
+- API validates input and checks for duplicates.
+- Service compares with the previous snapshot for the same product/version/source.
+- New snapshot and findings are stored in the database.
+- Change summary is calculated and stored.
 
 ## Test & Development
 
