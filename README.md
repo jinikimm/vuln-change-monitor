@@ -22,8 +22,8 @@ flowchart LR
   Wn --> FS
 ```
 
-서비스는 요청을 받아 DB에 작업 상태를 저장하고, 취약점 분석 작업을 인메모리 큐에 등록합니다.
-워커들은 큐에서 작업을 병렬로 소비하며, 결과를 DB에 기록하고 임시 파일 시스템을 사용합니다.
+The service receives requests, stores job state in the database, and enqueues vulnerability analysis jobs in an in-memory queue.
+Workers consume tasks concurrently from the queue, write results to the database, and use the temporary filesystem.
 
 ## Architecture
 
@@ -48,11 +48,11 @@ flowchart TD
   VS --> FS
 ```
 
-### 주요 포인트
+### Key Points
 
-- 큐는 백그라운드 작업 트리거로 사용됩니다.
-- 취약점 분석 작업은 한 번 큐에 등록되며, 하나의 워커 플로우에서 전체 처리가 이루어집니다.
-- 분석 로직은 `VulnerabilityService`에 집중되어 있습니다.
+- The queue is used as a trigger for background jobs.
+- Each vulnerability analysis job is enqueued once and fully processed in a single worker flow.
+- The analysis logic is centralized in `VulnerabilityService`.
 
 ## Vulnerability Analysis Request Flow
 
@@ -79,23 +79,11 @@ sequenceDiagram
   VS->>DB: status -> completed
 ```
 
-### 분석 동작
-
-- 재귀적 재등록 없이 한 번의 워커 작업에서 전체 분석이 수행됩니다.
-- 작업 상태는 `pending -> running -> completed`(또는 `failed`)로 갱신됩니다.
-
 ## Test & Development
 
-- 테스트는 `tests/` 디렉토리의 pytest 기반 테스트로 수행합니다.
-- 개발 환경은 requirements.txt 및 Dockerfile을 참고하세요.
-
-## Directory Structure
-
-- `app/` : 서비스 구현 코드
-- `tests/` : 테스트 코드
-- `migrations_alembic/` : DB 마이그레이션
-- `instance/` : 인스턴스별 설정/데이터
+- Tests are implemented using pytest in the `tests/` directory.
+- For development environment setup, refer to requirements.txt and Dockerfile.
 
 ---
 
-자세한 API 및 사용법은 코드와 주석을 참고하세요.
+For detailed API usage, refer to the code and comments.
