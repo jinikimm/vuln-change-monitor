@@ -1,5 +1,5 @@
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 
 db = SQLAlchemy()
@@ -14,7 +14,7 @@ class VulnerabilitySnapshot(db.Model):
     source = db.Column(db.String(128), nullable=False)
 
     snapshot_time = db.Column(db.DateTime, nullable=False)
-    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(datetime.timezone.utc))
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
 
     previous_snapshot_id = db.Column(db.String(36), db.ForeignKey("vulnerability_snapshots.id"), nullable=True)
     
@@ -72,4 +72,4 @@ class VulnerabilityChange(db.Model):
     previous_affected_status = db.Column(db.String(32), nullable=True)
     current_affected_status = db.Column(db.String(32), nullable=True)
     
-    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(datetime.timezone.utc))
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
