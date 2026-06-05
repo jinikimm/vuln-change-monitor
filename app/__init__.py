@@ -1,3 +1,4 @@
+from sqlalchemy import text
 import os
 from flask import Flask
 from flask_migrate import Migrate
@@ -21,8 +22,13 @@ def create_app(test_config=None):
 	app.register_blueprint(vulnerability_bp)
 	error_handlers(app)
 
-	@app.get("/healthz")
-	def healthz():
-		return {"status": "ok"}, 200
+	@app.get("/health")
+	def health():
+		try:
+			db.session.execute(text("SELECT 1"))
+			return {"status": "ok"}, 200
+		except Exception as e:
+			print("DB error:", e)
+			return {"status": "error"}, 500
 
 	return app
