@@ -1,7 +1,9 @@
-import time
 import json
+import time
 from uuid import uuid4
+
 from flask import g, request
+
 
 def init_logger(app):
 
@@ -14,13 +16,17 @@ def init_logger(app):
     def log_and_attach_request_id(response):
         duration_ms = int((time.time() - g.request_started_at) * 1000)
 
-        app.logger.info(json.dumps({
-            "request_id": g.request_id,
-            "method": request.method,
-            "path": request.path,
-            "status": response.status_code,
-            "duration_ms": duration_ms,
-        }))
+        app.logger.info(
+            json.dumps(
+                {
+                    "request_id": g.request_id,
+                    "method": request.method,
+                    "path": request.path,
+                    "status": response.status_code,
+                    "duration_ms": duration_ms,
+                }
+            )
+        )
 
         response.headers["X-Request-ID"] = g.request_id
         return response

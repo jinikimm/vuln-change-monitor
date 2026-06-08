@@ -1,4 +1,4 @@
-from flask import jsonify, g
+from flask import g, jsonify
 from werkzeug.exceptions import BadRequest
 
 
@@ -9,6 +9,7 @@ class Error(Exception):
         self.code = code
         self.message = message
         self.details = details if details is not None else []
+
 
 class ValidationError(Error):
     def __init__(self, details=None, message="Invalid snapshot payload"):
@@ -31,42 +32,53 @@ def error_handlers(app):
 
     @app.errorhandler(Error)
     def app_error(e):
-        return jsonify({
-            "request_id": _request_id(),
-            "error": {
-                "code": e.code,
-                "message": e.message,
-                "details": e.details,
-            }
-        }), e.status_code
-    
+        return (
+            jsonify(
+                {
+                    "request_id": _request_id(),
+                    "error": {
+                        "code": e.code,
+                        "message": e.message,
+                        "details": e.details,
+                    },
+                }
+            ),
+            e.status_code,
+        )
+
     @app.errorhandler(BadRequest)
     def bad_request(e):
-        return jsonify({
-            "request_id": _request_id(),
-            "error": {
-                "code": "validation_error",
-                "message": "Invalid snapshot payload",
-                "details": [
-                    {
-                        "field": "body",
-                        "message": "Malformed JSON",
-                    }
-                ],
-            }
-        }), 400
-    
+        return (
+            jsonify(
+                {
+                    "request_id": _request_id(),
+                    "error": {
+                        "code": "validation_error",
+                        "message": "Invalid snapshot payload",
+                        "details": [
+                            {
+                                "field": "body",
+                                "message": "Malformed JSON",
+                            }
+                        ],
+                    },
+                }
+            ),
+            400,
+        )
+
     @app.errorhandler(500)
     def internal_error(e):
         return (
-            jsonify({
-                "request_id": _request_id(),
-                "error": {
-                    "code": "internal_error",
-                    "message": "An unexpected error occurred.",
-                    "details": [],
+            jsonify(
+                {
+                    "request_id": _request_id(),
+                    "error": {
+                        "code": "internal_error",
+                        "message": "An unexpected error occurred.",
+                        "details": [],
+                    },
                 }
-            }),
+            ),
             500,
         )
-    
