@@ -136,6 +136,8 @@ Async snapshot API:
 - Added idempotency support with Idempotency-Key for sync and async snapshot submission.
 - Added async snapshot processing endpoints (submit/status/result).
 - Added optional finding fields: epss_score and known_exploited.
-- Added cvss_changed change type handling and severity direction helper.
+- Added cvss_changed change type handling.
 - Added structured error response shape with request_id.
 - Added live integration API tests for running environment.
+- Added severity ordering helpers for escalation/de-escalation reporting.
+- Added database transaction handling that guarantees data are committed atomically.
