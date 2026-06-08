@@ -3,6 +3,7 @@ import os
 from flask import Flask
 from flask_migrate import Migrate
 from .error_handler import error_handlers
+from .logger import init_logger
 from .models import db
 from .vulnerability_api import vulnerability_bp
 
@@ -21,6 +22,7 @@ def create_app(test_config=None):
 
 	app.register_blueprint(vulnerability_bp)
 	error_handlers(app)
+	init_logger(app)
 
 	@app.get("/health")
 	def health():
@@ -28,7 +30,6 @@ def create_app(test_config=None):
 			db.session.execute(text("SELECT 1"))
 			return {"status": "ok"}, 200
 		except Exception as e:
-			print("DB error:", e)
 			return {"status": "error"}, 500
 
 	return app

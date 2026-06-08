@@ -1,4 +1,4 @@
-from flask import jsonify
+from flask import jsonify, g
 from werkzeug.exceptions import BadRequest
 
 
@@ -26,9 +26,13 @@ class ConflictError(Error):
 
 
 def error_handlers(app):
+    def _request_id():
+        return getattr(g, "request_id", None)
+
     @app.errorhandler(Error)
     def app_error(e):
         return jsonify({
+            "request_id": _request_id(),
             "error": {
                 "code": e.code,
                 "message": e.message,
@@ -39,6 +43,7 @@ def error_handlers(app):
     @app.errorhandler(BadRequest)
     def bad_request(e):
         return jsonify({
+            "request_id": _request_id(),
             "error": {
                 "code": "validation_error",
                 "message": "Invalid snapshot payload",
@@ -55,6 +60,7 @@ def error_handlers(app):
     def internal_error(e):
         return (
             jsonify({
+                "request_id": _request_id(),
                 "error": {
                     "code": "internal_error",
                     "message": "An unexpected error occurred.",
