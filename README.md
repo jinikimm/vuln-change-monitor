@@ -31,10 +31,26 @@ docker-compose (db + app):
 docker compose up --build app db
 ```
 
-
 compose app startup command runs DB migration first:
 - flask db upgrade
 - python -m app.main
+
+### Example usage
+
+```bash
+curl -X POST http://localhost:8080/snapshots \
+-H "Content-Type: application/json" \
+-d @example/snapshot-day-1.json
+
+curl -X POST http://localhost:8080/snapshots \
+-H "Content-Type: application/json" \
+-d @example/snapshot-day-2.json
+
+curl http://localhost:8080/snapshots/<snapshot_id>/changes
+
+curl "http://localhost:8080/snapshots/<snapshot_id>/changes?change_type=severity_changed&limit=20&offset=0"
+```
+
 
 ## 3) Required environment variables and defaults
 
