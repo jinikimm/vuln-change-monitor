@@ -43,6 +43,8 @@ class VulnerabilityFinding(db.Model):
     
     severity = db.Column(db.String(16), nullable=False)
     cvss_score = db.Column(db.Float, nullable=False)
+    epss_score = db.Column(db.Float, nullable=True)
+    known_exploited = db.Column(db.Boolean, nullable=True)
     affected_status = db.Column(db.String(32), nullable=False)
 
     __table_args__ = (
