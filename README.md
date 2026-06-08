@@ -25,34 +25,12 @@ python -m app.main
 Default API port: 8080
 
 ## 2) Run with Docker / docker-compose
-
-Docker only (db + app):
-
-```bash
-docker build -t vuln-change-monitor .
-
-docker run -d \
-  --name db_local \
-  -e POSTGRES_DB=vuln_db \
-  -e POSTGRES_USER=vuln_user \
-  -e POSTGRES_PASSWORD=vuln_pass \
-  -p 5432:5432 \
-  postgres:15
-
-docker run --rm -p 8080:8080 \
-    -e DB_HOST=host.docker.internal \
-    -e DB_PORT=5432 \
-    -e DB_NAME=vuln_db \
-    -e DB_USER=vuln_user \
-    -e DB_PASSWORD=vuln_pass \
-    vuln-change-monitor
-```
-
 docker-compose (db + app):
 
 ```bash
-docker compose up --build
+docker compose up --build app db
 ```
+
 
 compose app startup command runs DB migration first:
 - flask db upgrade
@@ -85,11 +63,22 @@ If you only need quick local testing, tests use in-memory SQLite and do not requ
 
 ## 5) Run tests
 
+#### Functional tests are in tests/test_vulnerability_api.py.
+
+To run functional tests:
+
 ```bash
-pytest -q
+docker compose run --rm test pytest tests/api_test/
 ```
 
-Main tests are in tests/test_vulnerability_api.py.
+#### Live integration tests are in tests/integration_test/test_live_vulnerability_api.py.
+
+To run live integration tests:
+
+```bash
+docker compose run --rm test pytest tests/integration_test/
+```
+
 
 ## 6) Matching-key explanation
 
@@ -122,24 +111,31 @@ Duplicate submission:
 - DB unique constraint also prevents duplicate snapshot rows
 
 Idempotency:
-- no explicit idempotency key endpoint/header exists
-- practical behavior is conflict-based deduplication: repeated same-time submissions return 409 instead of creating extra rows
+- Idempotency-Key header is supported on POST /snapshots and POST /snapshots/async
+- same key replay on sync endpoint returns cached snapshot response (200)
+- same key replay on async endpoint returns the same job_id
+
+Async snapshot API:
+- POST /snapshots/async returns 202 with job_id
+- GET /snapshots/{job_id}/status returns processing/completed/failed
+- GET /snapshots/{job_id}/result returns snapshot result or error
 
 ## 8) Assumptions and shortcuts
 
-- Single service process, synchronous request handling (no queue/worker).
+- Single service process, async snapshot is handled by in-process thread (no external queue/worker).
 - Snapshot comparison only uses the immediate previous snapshot for the same product/version/source.
 - Change detection tracks new/resolved/severity_changed/status_changed/unchanged.
 - CVSS value is validated as numeric 0.0 to 10.0.
+- Optional finding fields epss_score (0.0 to 1.0) and known_exploited (boolean) are supported.
 
 ## 9) Improvements with more time
+- OpenAPI / Swagger specification.
 
-- Idempotency key support for safe retries and duplicate request handling.
-- Database integration tests using a real database or test containers.
-- Structured JSON logging with request IDs for better observability.
-- Severity ordering helpers for escalation and de-escalation reporting.
-- CVSS-specific change tracking or a dedicated `cvss_score_changed` change type.
-- Additional fields such as EPSS score or known-exploited indicators in the data model.
-- Asynchronous processing with a status endpoint for handling large snapshots.
-- Database transaction handling to ensure snapshot, findings, and changes are committed atomically.
-- OpenAPI / Swagger specification for clear API documentation.
+## 10) Bonus updates in this iteration
+
+- Added idempotency support with Idempotency-Key for sync and async snapshot submission.
+- Added async snapshot processing endpoints (submit/status/result).
+- Added optional finding fields: epss_score and known_exploited.
+- Added cvss_changed change type handling and severity direction helper.
+- Added structured error response shape with request_id.
+- Added live integration API tests for running environment.
