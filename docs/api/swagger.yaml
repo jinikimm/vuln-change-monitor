@@ -1,0 +1,349 @@
+openapi: 3.0.0
+
+info:
+  title: Vulnerability Snapshot API
+  version: 1.0.0
+  description: API for managing vulnerability snapshots and changes
+
+servers:
+  - url: http://localhost:5000
+
+paths:
+
+  /snapshots:
+    post:
+      summary: Create snapshot (sync)
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SnapshotRequest"
+      responses:
+        "201":
+          description: Snapshot created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SnapshotResponse"
+        "200":
+          description: Idempotent replay
+        "400":
+          description: Validation error
+        "409":
+          description: Conflict
+
+  /snapshots/async:
+    post:
+      summary: Create snapshot asynchronously
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SnapshotRequest"
+      responses:
+        "202":
+          description: Job created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job_id:
+                    type: string
+
+  /snapshots/{job_id}/status:
+    get:
+      summary: Get async job status
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: completed
+
+  /snapshots/{job_id}/result:
+    get:
+      summary: Get async job result
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Snapshot result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SnapshotResponse"
+
+  /products/{product_name}/versions/{product_version}/snapshots:
+    get:
+      summary: List snapshots
+      parameters:
+        - name: product_name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: product_version
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Snapshot list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SnapshotListItem"
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+
+  /snapshots/{snapshot_id}:
+    get:
+      summary: Get snapshot detail
+      parameters:
+        - name: snapshot_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Snapshot detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SnapshotDetail"
+
+        "404":
+          description: Not found
+
+  /snapshots/{snapshot_id}/changes:
+    get:
+      summary: Get snapshot changes
+      parameters:
+        - name: snapshot_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          schema:
+            type: integer
+        - name: change_type
+          in: query
+          schema:
+            type: string
+        - name: severity
+          in: query
+          schema:
+            type: string
+        - name: component_name
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Snapshot changes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Change"
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+
+
+components:
+
+  schemas:
+
+    SnapshotRequest:
+      type: object
+      required:
+        - product_name
+        - product_version
+        - source
+        - snapshot_time
+        - findings
+      properties:
+        product_name:
+          type: string
+        product_version:
+          type: string
+        source:
+          type: string
+        snapshot_time:
+          type: string
+          example: "2024-01-01T12:00:00Z"
+        findings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Finding"
+
+    Finding:
+      type: object
+      required:
+        - vulnerability_id
+        - component_name
+        - component_version
+        - severity
+        - cvss_score
+        - affected_status
+      properties:
+        vulnerability_id:
+          type: string
+        component_name:
+          type: string
+        component_version:
+          type: string
+        severity:
+          type: string
+          enum: [low, medium, high, critical, none, unknown]
+        cvss_score:
+          type: number
+          format: float
+        epss_score:
+          type: number
+        known_exploited:
+          type: boolean
+        affected_status:
+          type: string
+          enum: [affected, not affected, fixed, under_investigation, accepted_risk]
+
+    SnapshotResponse:
+      type: object
+      properties:
+        snapshot_id:
+          type: string
+        product_name:
+          type: string
+        product_version:
+          type: string
+        previous_snapshot_id:
+          type: string
+        summary:
+          type: object
+          properties:
+            new:
+              type: integer
+            resolved:
+              type: integer
+            severity_changed:
+              type: integer
+            status_changed:
+              type: integer
+            unchanged:
+              type: integer
+
+    SnapshotListItem:
+      type: object
+      properties:
+        snapshot_id:
+          type: string
+        snapshot_time:
+          type: string
+        source:
+          type: string
+        finding_count:
+          type: integer
+        created_at:
+          type: string
+
+    SnapshotDetail:
+      type: object
+      properties:
+        snapshot_id:
+          type: string
+        product_name:
+          type: string
+        product_version:
+          type: string
+        source:
+          type: string
+        snapshot_time:
+          type: string
+        finding_count:
+          type: integer
+        previous_snapshot_id:
+          type: string
+        summary:
+          $ref: "#/components/schemas/SnapshotResponse/properties/summary"
+
+    Change:
+      type: object
+      properties:
+        change_type:
+          type: string
+        vulnerability_id:
+          type: string
+        component_name:
+          type: string
+        component_version:
+          type: string
+        package_url:
+          type: string
+        severity_direction:
+          type: string
+          enum: [escalated, de_escalated, unchanged, null]
+        previous:
+          type: object
+        current:
+          type: object

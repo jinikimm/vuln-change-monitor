@@ -1,5 +1,7 @@
 import os
 
+import yaml
+from flasgger import Swagger
 from flask import Flask
 from flask_migrate import Migrate
 from sqlalchemy import text
@@ -26,6 +28,10 @@ def create_app(test_config=None):
     app.register_blueprint(vulnerability_bp)
     error_handlers(app)
     init_logger(app)
+
+    with open("docs/api/swagger.yaml") as f:
+        template = yaml.safe_load(f)
+    Swagger(app, template=template)
 
     @app.get("/health")
     def health():

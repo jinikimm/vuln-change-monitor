@@ -12,3 +12,4 @@ class Config:
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     PORT = int(os.getenv("PORT", 8080))
+    SWAGGER = {'openapi': '3.0.0'}
