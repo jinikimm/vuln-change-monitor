@@ -1,0 +1,18 @@
+@startuml seq-sync-snapshot-vuln-change-monitor
+title Sequence: Synchronous Snapshot Create
+
+participant Client as "API Client"
+participant API as "vulnerability_api"
+participant Svc as "VulnerabilityService"
+participant DB as "PostgreSQL"
+
+Client -> API: POST /snapshots
+API -> Svc: create_snapshot(data, idempotency_key)
+Svc -> Svc: normalize_snapshot_input()
+Svc -> Svc: find_previous_snapshot()
+Svc -> Svc: compare_snapshots()
+Svc -> DB: insert snapshot/findings/changes (transaction)
+Svc --> API: response, status_code
+API --> Client: 201 Created (or 200 idempotent replay)
+
+@enduml

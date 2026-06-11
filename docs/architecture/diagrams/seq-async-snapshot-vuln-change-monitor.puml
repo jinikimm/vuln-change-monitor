@@ -1,0 +1,29 @@
+@startuml seq-async-snapshot-vuln-change-monitor
+title Sequence: Asynchronous Snapshot Create
+
+participant Client as "API Client"
+participant API as "vulnerability_api"
+participant Svc as "VulnerabilityService"
+participant Thread as "Background Thread"
+participant DB as "PostgreSQL"
+
+Client -> API: POST /snapshots/async
+API -> Svc: submit_snapshot(data, idempotency_key)
+Svc -> Svc: create job_id and jobs[job_id]=processing
+Svc -> Thread: start _process_snapshot_job(...)
+Svc --> API: job_id
+API --> Client: 202 Accepted
+
+Thread -> Svc: create_snapshot(...)
+Svc -> DB: persist snapshot transaction
+Thread -> Svc: jobs[job_id]=completed|failed
+
+Client -> API: GET /snapshots/{job_id}
+API -> Svc: get_snapshot_status(job_id)
+API --> Client: status
+
+Client -> API: GET /snapshots/{job_id}/result
+API -> Svc: get_snapshot_result(job_id)
+API --> Client: result
+
+@enduml
