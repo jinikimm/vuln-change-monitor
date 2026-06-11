@@ -1,0 +1,59 @@
+@startuml erd-vuln-change-monitor
+title ERD: Vulnerability Change Monitor
+
+entity "vulnerability_snapshots" as snapshots {
+  * id : VARCHAR(36) <<PK>>
+  --
+  product_name : VARCHAR(128)
+  product_version : VARCHAR(64)
+  source : VARCHAR(128)
+  snapshot_time : DATETIME
+  created_at : DATETIME
+  previous_snapshot_id : VARCHAR(36) <<FK self>>
+  finding_count : INT
+  summary_new : INT
+  summary_resolved : INT
+  summary_severity_changed : INT
+  summary_status_changed : INT
+  summary_unchanged : INT
+}
+
+entity "vulnerability_findings" as findings {
+  * id : VARCHAR(36) <<PK>>
+  --
+  snapshot_id : VARCHAR(36) <<FK snapshots.id>>
+  vulnerability_id : VARCHAR(64)
+  component_name : VARCHAR(128)
+  component_version : VARCHAR(64)
+  package_url : VARCHAR(255)
+  severity : VARCHAR(16)
+  cvss_score : FLOAT
+  epss_score : FLOAT
+  known_exploited : BOOLEAN
+  affected_status : VARCHAR(32)
+}
+
+entity "vulnerability_changes" as changes {
+  * id : VARCHAR(36) <<PK>>
+  --
+  snapshot_id : VARCHAR(36) <<FK snapshots.id>>
+  previous_snapshot_id : VARCHAR(36) <<FK snapshots.id>>
+  change_type : VARCHAR(32)
+  vulnerability_id : VARCHAR(64)
+  component_name : VARCHAR(128)
+  component_version : VARCHAR(64)
+  package_url : VARCHAR(255)
+  previous_severity : VARCHAR(16)
+  current_severity : VARCHAR(16)
+  previous_cvss_score : FLOAT
+  current_cvss_score : FLOAT
+  previous_affected_status : VARCHAR(32)
+  current_affected_status : VARCHAR(32)
+  created_at : DATETIME
+}
+
+snapshots ||--o{ findings : has
+snapshots ||--o{ changes : has
+snapshots ||--o| snapshots : previous_snapshot
+
+@enduml
