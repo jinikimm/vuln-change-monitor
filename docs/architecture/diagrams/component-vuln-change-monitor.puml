@@ -1,0 +1,22 @@
+@startuml component-vuln-change-monitor
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Component Diagram: Vulnerability Change Monitor
+
+Container_Boundary(api_container, "Flask API") {
+    Component(api_routes, "vulnerability_api", "Flask Blueprint", "HTTP routes for snapshots and changes")
+    Component(service, "VulnerabilityService", "Service class", "Validation, diffing, persistence, idempotency, async jobs")
+    Component(errors, "error_handler", "Flask error handlers", "Maps exceptions to JSON errors")
+    Component(logs, "logger", "Request middleware", "Request id and structured logs")
+    Component(models, "models", "SQLAlchemy models", "Snapshot/finding/change entities")
+}
+
+ContainerDb(db, "PostgreSQL", "", "")
+
+Rel(api_routes, service, "calls")
+Rel(service, models, "uses")
+Rel(service, db, "CRUD")
+Rel(api_routes, errors, "handled by")
+Rel(api_routes, logs, "observed by")
+
+@enduml

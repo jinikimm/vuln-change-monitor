@@ -1,0 +1,13 @@
+@startuml system-context-vuln-change-monitor
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+title System Context: Vulnerability Change Monitor
+
+Person(client, "API Client", "Submits snapshots and reads computed changes")
+System(vcm, "Vulnerability Change Monitor", "Flask API for snapshot ingestion and diff")
+SystemDb_Ext(db, "PostgreSQL", "Stores snapshots, findings, and change rows")
+
+Rel(client, vcm, "Submit and query", "HTTP/JSON")
+Rel(vcm, db, "Read/Write", "SQL")
+
+@enduml

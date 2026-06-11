@@ -1,0 +1,16 @@
+@startuml container-vuln-change-monitor
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title Container Diagram: Vulnerability Change Monitor
+
+Person(client, "API Client", "")
+
+System_Boundary(system, "Vulnerability Change Monitor") {
+    Container(api, "Flask API", "Python 3.11 / Flask", "Snapshot ingestion, diff, and query endpoints")
+    ContainerDb(db, "PostgreSQL 15", "PostgreSQL", "Persistent store for snapshot domain")
+}
+
+Rel(client, api, "REST", "HTTP/JSON : 8080")
+Rel(api, db, "ORM", "SQLAlchemy/TCP : 5432")
+
+@enduml

@@ -1,0 +1,17 @@
+@startuml deployment-vuln-change-monitor
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Deployment.puml
+
+title Deployment Diagram: Vulnerability Change Monitor
+
+Deployment_Node(host, "Docker Host", "Linux") {
+    Deployment_Node(app_node, "app container", "python:3.11-slim") {
+        Container(flask_app, "Flask Application", "Python 3.11", "Runs flask db upgrade then python -m app.main")
+    }
+    Deployment_Node(db_node, "db container", "postgres:15") {
+        ContainerDb(postgres, "PostgreSQL", "PostgreSQL", "Stores snapshot domain")
+    }
+}
+
+Rel(flask_app, postgres, "SQLAlchemy", "TCP 5432")
+
+@enduml
