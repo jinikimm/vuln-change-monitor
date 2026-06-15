@@ -24,7 +24,7 @@
 
 ---
 
-## 2. Exception Handling Coverage
+### 2. Exception Handling Coverage
 
 **Q. Why are exception handling mechanisms incomplete in this repo?**
 
@@ -40,7 +40,7 @@
 
 ---
 
-## 3. Duplicate Endpoint Design
+### 3. Duplicate Endpoint Design
 
 **Q. Why are `/snapshots` and `/snapshots/async` both declared? Are both intentional?**
 
@@ -58,7 +58,7 @@
 
 ---
 
-## 4. Route Path Simplification
+### 4. Route Path Simplification
 
 **Q. Should `GET /products/<product_name>/versions/<product_version>/snapshots` be refactored to `/prod_versions/{prod_version}/snapshots`?**
 
