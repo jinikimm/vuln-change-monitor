@@ -8,8 +8,8 @@ from sqlalchemy import text
 
 from .error_handler import error_handlers
 from .logger import init_logger
-from .models import db
-from .vulnerability_api import vulnerability_bp
+from .db.models import db
+from .api.vulnerability_api import vulnerability_bp
 
 
 def create_app(test_config=None):
