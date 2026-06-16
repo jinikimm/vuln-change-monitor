@@ -20,7 +20,15 @@
 
 **Updates**
 
-- .
+  (updated layout)
+  - `service/` — Business logic implementation
+  - `api/` — HTTP request/response handling
+  - `db/` — Domain data models
+  - `__init__.py`
+  - `config.py` — Global configuration
+  - `error_handler.py` — Exception handling
+  - `logger.py` — Logging initialization
+  - `main.py`
 
 ---
 
@@ -36,7 +44,7 @@
 
 **Updates**
 
-- .
+- [docs/api/swagger.yaml](../../docs/api/swagger.yaml): API v1.2.0 - Add detailed error scenario and reponse examples to all endpoints (total 8 endpoints, 10+ error scenario)
 
 ---
 
