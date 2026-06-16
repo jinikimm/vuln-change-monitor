@@ -2,8 +2,13 @@ openapi: 3.0.0
 
 info:
   title: Vulnerability Snapshot API
-  version: 1.1.0
-  description: API for managing vulnerability snapshots and changes
+  version: 1.2.0
+  description: |
+    API for managing vulnerability snapshots and tracking changes.
+    
+    ## Error Response Format
+    All error responses follow the standard error format with a request_id for traceability.
+    See the ErrorResponse schema for details.
 
 servers:
   - url: http://localhost:8080
@@ -13,12 +18,16 @@ paths:
   /snapshots:
     post:
       summary: Create snapshot (sync)
+      description: |
+        Create a vulnerability snapshot synchronously. The operation will process the snapshot 
+        and return the result immediately. Supports idempotent operations via Idempotency-Key header.
       parameters:
         - name: Idempotency-Key
           in: header
           required: false
           schema:
             type: string
+          description: Optional UUID for idempotent operations. Same key within 24 hours returns cached result.
       requestBody:
         required: true
         content:
@@ -27,27 +36,146 @@ paths:
               $ref: "#/components/schemas/SnapshotRequest"
       responses:
         "201":
-          description: Snapshot created
+          description: Snapshot created successfully
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/SnapshotResponse"
+              examples:
+                success:
+                  summary: Successful snapshot creation
+                  value:
+                    snapshot_id: "550e8400-e29b-41d4-a716-446655440000"
+                    product_name: "MyProduct"
+                    product_version: "1.0.0"
+                    previous_snapshot_id: "550e8400-e29b-41d4-a716-446655440001"
+                    summary:
+                      new: 5
+                      resolved: 2
+                      severity_changed: 1
+                      status_changed: 0
+                      unchanged: 10
         "200":
-          description: Idempotent replay
+          description: |
+            Idempotent replay - A snapshot with the same Idempotency-Key was already created.
+            This response returns the cached result from the original request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SnapshotResponse"
         "400":
-          description: Validation error
+          description: Validation error in snapshot payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                malformedJson:
+                  summary: Malformed JSON in request body
+                  value:
+                    request_id: "req-123"
+                    error:
+                      code: "validation_error"
+                      message: "Invalid snapshot payload"
+                      details:
+                        - field: "body"
+                          message: "Malformed JSON"
+                missingRequired:
+                  summary: Missing required field
+                  value:
+                    request_id: "req-124"
+                    error:
+                      code: "validation_error"
+                      message: "Invalid snapshot payload"
+                      details:
+                        - field: "product_name"
+                          message: "product_name is required"
+                invalidSeverity:
+                  summary: Invalid severity value in finding
+                  value:
+                    request_id: "req-125"
+                    error:
+                      code: "validation_error"
+                      message: "Invalid snapshot payload"
+                      details:
+                        - field: "findings[0].severity"
+                          message: "severity must be one of critical, high, medium, low, none, unknown"
+                invalidCvssScore:
+                  summary: CVSS score out of range
+                  value:
+                    request_id: "req-126"
+                    error:
+                      code: "validation_error"
+                      message: "Invalid snapshot payload"
+                      details:
+                        - field: "findings[0].cvss_score"
+                          message: "cvss_score must be between 0.0 and 10.0"
+                invalidTimestamp:
+                  summary: Invalid timestamp format
+                  value:
+                    request_id: "req-127"
+                    error:
+                      code: "validation_error"
+                      message: "Invalid snapshot payload"
+                      details:
+                        - field: "snapshot_time"
+                          message: "snapshot_time must be UTC format YYYY-MM-DDTHH:MM:SSZ"
+                duplicateFindings:
+                  summary: Duplicate findings in snapshot
+                  value:
+                    request_id: "req-128"
+                    error:
+                      code: "validation_error"
+                      message: "Invalid snapshot payload"
+                      details:
+                        - field: "findings[5]"
+                          message: "duplicate finding key in same snapshot"
         "409":
-          description: Conflict
+          description: Conflict - Operation cannot proceed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                snapshotTimeNotLater:
+                  summary: Snapshot time not later than previous
+                  value:
+                    request_id: "req-129"
+                    error:
+                      code: "conflict"
+                      message: "Snapshot time must be later than previous snapshot"
+                      details:
+                        - field: "snapshot_time"
+                          message: "Snapshot time must be later than previous snapshot"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                internalError:
+                  summary: Unexpected internal error
+                  value:
+                    request_id: "req-999"
+                    error:
+                      code: "internal_error"
+                      message: "An unexpected error occurred."
+                      details: []
 
   /snapshots/async:
     post:
       summary: Create snapshot asynchronously
+      description: |
+        Submit a vulnerability snapshot for asynchronous processing. Returns immediately with 
+        a job_id that can be used to poll for status and retrieve results.
       parameters:
         - name: Idempotency-Key
           in: header
           required: false
           schema:
             type: string
+          description: Optional UUID for idempotent operations. Same key within 24 hours returns same job_id.
       requestBody:
         required: true
         content:
@@ -56,7 +184,7 @@ paths:
               $ref: "#/components/schemas/SnapshotRequest"
       responses:
         "202":
-          description: Job created
+          description: Async job submitted successfully
           content:
             application/json:
               schema:
@@ -64,21 +192,52 @@ paths:
                 properties:
                   job_id:
                     type: string
+                    description: Unique identifier for tracking job status and results
+              examples:
+                submitted:
+                  summary: Job submitted
+                  value:
+                    job_id: "job-550e8400-e29b-41d4-a716-446655440000"
         "400":
-          description: Validation error
+          description: Validation error in snapshot payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                malformedJson:
+                  summary: Malformed JSON in request body
+                  value:
+                    request_id: "req-200"
+                    error:
+                      code: "validation_error"
+                      message: "Invalid snapshot payload"
+                      details:
+                        - field: "body"
+                          message: "Malformed JSON"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /snapshots/{job_id}/status:
     get:
       summary: Get async job status
+      description: |
+        Retrieve the status of an asynchronously submitted snapshot job.
+        Possible status values: processing, completed, failed
       parameters:
         - name: job_id
           in: path
           required: true
           schema:
             type: string
+          description: The job ID returned from async submission
       responses:
         "200":
-          description: Job status
+          description: Job status retrieved successfully
           content:
             application/json:
               schema:
@@ -86,61 +245,167 @@ paths:
                 properties:
                   status:
                     type: string
-                    example: completed
+                    enum: [processing, completed, failed]
+                    description: Current status of the job
+              examples:
+                processing:
+                  summary: Job is still processing
+                  value:
+                    status: "processing"
+                completed:
+                  summary: Job completed successfully
+                  value:
+                    status: "completed"
+                failed:
+                  summary: Job failed
+                  value:
+                    status: "failed"
         "404":
           description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                jobNotFound:
+                  summary: Job ID does not exist
+                  value:
+                    request_id: "req-301"
+                    error:
+                      code: "not_found"
+                      message: "Job not found"
+                      details:
+                        - field: "job_id"
+                          message: "Job not found"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /snapshots/{job_id}/result:
     get:
       summary: Get async job result
+      description: |
+        Retrieve the result of a completed async job. Job must be in 'completed' status.
+        Returns the snapshot result on success, or error details if the job failed.
       parameters:
         - name: job_id
           in: path
           required: true
           schema:
             type: string
+          description: The job ID returned from async submission
       responses:
         "200":
-          description: Snapshot result
+          description: Job result retrieved successfully
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: "#/components/schemas/SnapshotResponse"
-                  - type: object
-                    properties:
-                      error:
-                        type: string
+                $ref: "#/components/schemas/SnapshotResponse"
+              examples:
+                success:
+                  summary: Job completed with success
+                  value:
+                    snapshot_id: "550e8400-e29b-41d4-a716-446655440000"
+                    product_name: "MyProduct"
+                    product_version: "1.0.0"
+                    previous_snapshot_id: null
+                    summary:
+                      new: 15
+                      resolved: 0
+                      severity_changed: 0
+                      status_changed: 0
+                      unchanged: 0
         "404":
           description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                jobNotFound:
+                  summary: Job ID does not exist
+                  value:
+                    request_id: "req-302"
+                    error:
+                      code: "not_found"
+                      message: "Job not found"
+                      details:
+                        - field: "job_id"
+                          message: "Job not found"
+        "409":
+          description: Conflict - Job is not in a state where result can be retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                jobProcessing:
+                  summary: Job is still processing
+                  value:
+                    request_id: "req-303"
+                    error:
+                      code: "conflict"
+                      message: "Job is not completed yet"
+                      details:
+                        - field: "job_id"
+                          message: "Job is not completed yet"
+                jobFailed:
+                  summary: Job failed
+                  value:
+                    request_id: "req-304"
+                    error:
+                      code: "conflict"
+                      message: "Job failed"
+                      details:
+                        - field: "job_id"
+                          message: "Job failed: Unknown error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /products/{product_name}/versions/{product_version}/snapshots:
     get:
-      summary: List snapshots
+      summary: List snapshots for a product version
+      description: |
+        List all snapshots for a specific product and version combination.
+        Supports pagination via limit and offset query parameters.
       parameters:
         - name: product_name
           in: path
           required: true
           schema:
             type: string
+          description: Product name (URL encoded if contains special characters)
         - name: product_version
           in: path
           required: true
           schema:
             type: string
+          description: Product version (URL encoded if contains special characters)
         - name: limit
           in: query
           schema:
             type: integer
             default: 10
+            minimum: 1
+            maximum: 100
+          description: Maximum number of results (default 10, max 100)
         - name: offset
           in: query
           schema:
             type: integer
             default: 0
+            minimum: 0
+          description: Number of results to skip (default 0)
       responses:
         "200":
-          description: Snapshot list
+          description: Snapshot list retrieved successfully
           content:
             application/json:
               schema:
@@ -154,59 +419,164 @@ paths:
                     type: integer
                   offset:
                     type: integer
+              examples:
+                success:
+                  summary: List of snapshots
+                  value:
+                    items:
+                      - snapshot_id: "550e8400-e29b-41d4-a716-446655440000"
+                        snapshot_time: "2024-01-15T12:00:00Z"
+                        source: "scanner1"
+                        finding_count: 42
+                        created_at: "2024-01-15T12:05:30Z"
+                      - snapshot_id: "550e8400-e29b-41d4-a716-446655440001"
+                        snapshot_time: "2024-01-14T12:00:00Z"
+                        source: "scanner1"
+                        finding_count: 38
+                        created_at: "2024-01-14T12:05:30Z"
+                    limit: 10
+                    offset: 0
+        "400":
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                nonIntegerLimit:
+                  summary: limit is not an integer
+                  value:
+                    request_id: "req-401"
+                    error:
+                      code: "validation_error"
+                      message: "Invalid snapshot payload"
+                      details:
+                        - field: "query"
+                          message: "limit and offset must be integers"
+                negativeOffset:
+                  summary: offset is negative
+                  value:
+                    request_id: "req-402"
+                    error:
+                      code: "validation_error"
+                      message: "Invalid snapshot payload"
+                      details:
+                        - field: "query"
+                          message: "limit and offset must be non-negative"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /snapshots/{snapshot_id}:
     get:
       summary: Get snapshot detail
+      description: |
+        Retrieve detailed information about a specific snapshot including the summary 
+        of changes compared to the previous snapshot.
       parameters:
         - name: snapshot_id
           in: path
           required: true
           schema:
             type: string
+          description: The snapshot UUID
       responses:
         "200":
-          description: Snapshot detail
+          description: Snapshot detail retrieved successfully
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/SnapshotDetail"
-
+              examples:
+                success:
+                  summary: Snapshot details
+                  value:
+                    snapshot_id: "550e8400-e29b-41d4-a716-446655440000"
+                    product_name: "MyProduct"
+                    product_version: "1.0.0"
+                    source: "scanner1"
+                    snapshot_time: "2024-01-15T12:00:00Z"
+                    finding_count: 42
+                    previous_snapshot_id: "550e8400-e29b-41d4-a716-446655440001"
+                    summary:
+                      new: 5
+                      resolved: 2
+                      severity_changed: 1
+                      status_changed: 3
+                      unchanged: 31
         "404":
-          description: Not found
+          description: Snapshot not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                notFound:
+                  summary: Snapshot with given ID does not exist
+                  value:
+                    request_id: "req-501"
+                    error:
+                      code: "not_found"
+                      message: "Snapshot not found"
+                      details:
+                        - field: "snapshot_id"
+                          message: "Snapshot not found"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /snapshots/{snapshot_id}/changes:
     get:
       summary: Get snapshot changes
+      description: |
+        Retrieve vulnerability changes from a specific snapshot.
+        Supports filtering by change_type, severity, and component_name.
       parameters:
         - name: snapshot_id
           in: path
           required: true
           schema:
             type: string
+          description: The snapshot UUID
         - name: limit
           in: query
           schema:
             type: integer
+            minimum: 1
+            maximum: 100
+          description: Maximum number of results (max 100)
         - name: offset
           in: query
           schema:
             type: integer
+            minimum: 0
+          description: Number of results to skip
         - name: change_type
           in: query
           schema:
             type: string
+            enum: [new, resolved, severity_changed, status_changed, cvss_changed]
+          description: Filter by type of change
         - name: severity
           in: query
           schema:
             type: string
+            enum: [low, medium, high, critical, none, unknown]
+          description: Filter by severity (matches current or previous severity)
         - name: component_name
           in: query
           schema:
             type: string
+          description: Filter by component name (exact match)
       responses:
         "200":
-          description: Snapshot changes
+          description: Snapshot changes retrieved successfully
           content:
             application/json:
               schema:
@@ -222,15 +592,88 @@ paths:
                   offset:
                     type: integer
                     nullable: true
+              examples:
+                success:
+                  summary: List of changes
+                  value:
+                    items:
+                      - change_type: "new"
+                        vulnerability_id: "CVE-2024-1234"
+                        component_name: "openssl"
+                        component_version: "1.1.1"
+                        package_url: "pkg:deb/debian/openssl@1.1.1"
+                        severity_direction: null
+                        previous: null
+                        current:
+                          severity: "critical"
+                          affected_status: "affected"
+                          cvss_score: 9.8
+                      - change_type: "severity_changed"
+                        vulnerability_id: "CVE-2024-5678"
+                        component_name: "curl"
+                        component_version: "7.68.0"
+                        package_url: "pkg:deb/debian/curl@7.68.0"
+                        severity_direction: "escalated"
+                        previous:
+                          severity: "medium"
+                          affected_status: "affected"
+                          cvss_score: 5.3
+                        current:
+                          severity: "high"
+                          affected_status: "affected"
+                          cvss_score: 7.5
+                    limit: 10
+                    offset: 0
+        "400":
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalidParams:
+                  summary: Invalid limit or offset
+                  value:
+                    request_id: "req-601"
+                    error:
+                      code: "validation_error"
+                      message: "Invalid snapshot payload"
+                      details:
+                        - field: "query"
+                          message: "limit and offset must be integers"
         "404":
           description: Snapshot not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                notFound:
+                  summary: Snapshot with given ID does not exist
+                  value:
+                    request_id: "req-602"
+                    error:
+                      code: "not_found"
+                      message: "Snapshot not found"
+                      details:
+                        - field: "snapshot_id"
+                          message: "Snapshot not found"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /health:
     get:
       summary: Health check with DB connectivity probe
+      description: |
+        Verify that the service is running and the database is accessible.
+        Returns 200 if both are healthy, 500 if database connection fails.
       responses:
         "200":
-          description: Service and DB are reachable
+          description: Service and database are healthy
           content:
             application/json:
               schema:
@@ -238,31 +681,101 @@ paths:
                 properties:
                   status:
                     type: string
+                    enum: [ok]
                     example: ok
+              examples:
+                healthy:
+                  summary: Everything is operational
+                  value:
+                    status: "ok"
         "500":
-          description: DB connectivity failed
+          description: Service unavailable - database connectivity failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                dbFailure:
+                  summary: Database connection failure
+                  value:
+                    request_id: "req-901"
+                    error:
+                      code: "internal_error"
+                      message: "An unexpected error occurred."
+                      details: []
 
 
 components:
 
   schemas:
 
+    ErrorResponse:
+      type: object
+      description: |
+        Standard error response format for all API endpoints.
+        Includes request_id for traceability and detailed error information.
+      required:
+        - request_id
+        - error
+      properties:
+        request_id:
+          type: string
+          nullable: true
+          description: Unique identifier for this request (for traceability and debugging)
+        error:
+          type: object
+          required:
+            - code
+            - message
+            - details
+          properties:
+            code:
+              type: string
+              description: Machine-readable error code
+              enum:
+                - validation_error
+                - not_found
+                - conflict
+                - internal_error
+            message:
+              type: string
+              description: Human-readable error message
+            details:
+              type: array
+              description: Array of detailed error information for each field/aspect
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                    description: The field or aspect that caused the error
+                  message:
+                    type: string
+                    description: Detailed description of the specific error
+
     SnapshotSummary:
       type: object
+      description: Summary of changes in a snapshot compared to the previous snapshot
       properties:
         new:
           type: integer
+          description: Number of new vulnerabilities found
         resolved:
           type: integer
+          description: Number of vulnerabilities resolved since previous snapshot
         severity_changed:
           type: integer
+          description: Number of vulnerabilities with severity change
         status_changed:
           type: integer
+          description: Number of vulnerabilities with affected_status change
         unchanged:
           type: integer
+          description: Number of vulnerabilities with no changes
 
     SnapshotRequest:
       type: object
+      description: Request payload for creating a vulnerability snapshot
       required:
         - product_name
         - product_version
@@ -272,20 +785,30 @@ components:
       properties:
         product_name:
           type: string
+          description: Name of the product
         product_version:
           type: string
+          description: Version of the product
         source:
           type: string
+          description: Source/scanner that generated this snapshot
         snapshot_time:
           type: string
-          example: "2024-01-01T12:00:00Z"
+          format: date-time
+          description: |
+            UTC timestamp in ISO 8601 format (YYYY-MM-DDTHH:MM:SSZ)
+            Must be later than the previous snapshot for the same product version and source
+          example: "2024-01-15T12:00:00Z"
         findings:
           type: array
+          minItems: 0
+          description: Array of vulnerability findings in this snapshot
           items:
             $ref: "#/components/schemas/Finding"
 
     Finding:
       type: object
+      description: A single vulnerability finding
       required:
         - vulnerability_id
         - component_name
@@ -296,94 +819,163 @@ components:
       properties:
         vulnerability_id:
           type: string
+          description: CVE ID or other vulnerability identifier
         component_name:
           type: string
+          description: Name of the affected software component
         component_version:
           type: string
+          description: Version of the affected component
         severity:
           type: string
           enum: [low, medium, high, critical, none, unknown]
+          description: Severity level of the vulnerability
         cvss_score:
           type: number
           format: float
+          minimum: 0.0
+          maximum: 10.0
+          description: CVSS v3.1 score (0.0 to 10.0)
         epss_score:
           type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          nullable: true
+          description: Exploit Prediction Scoring System score (0.0 to 1.0, optional)
         known_exploited:
           type: boolean
+          nullable: true
+          description: Whether this vulnerability has known public exploits (optional)
         affected_status:
           type: string
           enum: [affected, not affected, fixed, under_investigation, accepted_risk]
+          description: Current status of vulnerability for this component
 
     SnapshotResponse:
       type: object
+      description: Response for successful snapshot creation
       properties:
         snapshot_id:
           type: string
+          description: Unique identifier for the snapshot
         product_name:
           type: string
+          description: Name of the product
         product_version:
           type: string
+          description: Version of the product
         previous_snapshot_id:
           type: string
           nullable: true
+          description: ID of the previous snapshot for the same product/version/source, null if this is the first
         summary:
           $ref: "#/components/schemas/SnapshotSummary"
 
     SnapshotListItem:
       type: object
+      description: Snapshot information in a list response
       properties:
         snapshot_id:
           type: string
+          description: Unique identifier for the snapshot
         snapshot_time:
           type: string
+          format: date-time
+          description: UTC timestamp when the snapshot was taken
         source:
           type: string
+          description: Source/scanner that generated this snapshot
         finding_count:
           type: integer
+          description: Total number of findings in this snapshot
         created_at:
           type: string
+          format: date-time
+          description: UTC timestamp when the snapshot was stored
 
     SnapshotDetail:
       type: object
+      description: Detailed information about a snapshot
       properties:
         snapshot_id:
           type: string
+          description: Unique identifier for the snapshot
         product_name:
           type: string
+          description: Name of the product
         product_version:
           type: string
+          description: Version of the product
         source:
           type: string
+          description: Source/scanner that generated this snapshot
         snapshot_time:
           type: string
+          format: date-time
+          description: UTC timestamp when the snapshot was taken
         finding_count:
           type: integer
+          description: Total number of findings in this snapshot
         previous_snapshot_id:
           type: string
           nullable: true
+          description: ID of the previous snapshot, null if this is the first
         summary:
           $ref: "#/components/schemas/SnapshotSummary"
 
     Change:
       type: object
+      description: A vulnerability change between snapshots
       properties:
         change_type:
           type: string
           enum: [new, resolved, severity_changed, status_changed, cvss_changed]
+          description: Type of change
         vulnerability_id:
           type: string
+          description: CVE ID or vulnerability identifier
         component_name:
           type: string
+          description: Name of the affected component
         component_version:
           type: string
+          description: Version of the affected component
         package_url:
           type: string
+          description: Package URL (purl) for the component
         severity_direction:
           type: string
-          enum: [escalated, de_escalated, unchanged, null]
+          enum: [escalated, de_escalated, unchanged]
+          nullable: true
+          description: |
+            For severity_changed: Direction of severity change (escalated or de_escalated).
+            For other change types: null.
         previous:
           type: object
           nullable: true
+          description: Previous vulnerability details (null for 'new' change_type)
+          properties:
+            severity:
+              type: string
+              enum: [low, medium, high, critical, none, unknown]
+            affected_status:
+              type: string
+              enum: [affected, not affected, fixed, under_investigation, accepted_risk]
+            cvss_score:
+              type: number
+              format: float
         current:
           type: object
           nullable: true
+          description: Current vulnerability details (null for 'resolved' change_type)
+          properties:
+            severity:
+              type: string
+              enum: [low, medium, high, critical, none, unknown]
+            affected_status:
+              type: string
+              enum: [affected, not affected, fixed, under_investigation, accepted_risk]
+            cvss_score:
+              type: number
+              format: float
