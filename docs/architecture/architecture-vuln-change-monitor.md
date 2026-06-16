@@ -1,7 +1,7 @@
 # Architecture: Vulnerability Change Monitor
 
-Version: 1.0.0
-Last Updated: 2026-06-11
+Version: 1.1.0
+Last Updated: 2026-06-16
 Scenario: C - Reverse Engineering
 
 ---
@@ -18,6 +18,7 @@ Key capabilities:
 - Persistent storage in PostgreSQL
 - Optional idempotency behavior using in-memory cache
 - Async job polling with in-memory job status map
+- OpenAPI documentation served through Flasgger
 
 ---
 
@@ -59,16 +60,16 @@ See diagram: [diagrams/container-vuln-change-monitor.puml](diagrams/container-vu
 
 ### 4.2 Component Responsibilities
 
-- `app/vulnerability_api.py`
+- `app/api/vulnerability_api.py`
   - POST `/snapshots`
   - POST `/snapshots/async`
-  - GET `/snapshots/<job_id>`
+  - GET `/snapshots/<job_id>/status`
   - GET `/snapshots/<job_id>/result`
   - GET `/products/<product_name>/versions/<product_version>/snapshots`
   - GET `/snapshots/<snapshot_id>`
   - GET `/snapshots/<snapshot_id>/changes`
 
-- `app/vulnerability_service.py`
+- `app/service/vulnerability_service.py`
   - Validates payload schema and semantic rules
   - Normalizes numeric fields (`cvss_score`, optional `epss_score`)
   - Finds previous snapshot and computes diff sets by finding key
@@ -82,6 +83,10 @@ See diagram: [diagrams/container-vuln-change-monitor.puml](diagrams/container-vu
 - `app/logger.py`
   - Adds and returns `X-Request-ID`
   - Logs request metadata and latency as JSON
+
+- `app/db/models.py`
+  - Defines snapshot/finding/change entities
+  - Applies enum, unique, check, and FK cascade constraints
 
 See diagram: [diagrams/component-vuln-change-monitor.puml](diagrams/component-vuln-change-monitor.puml)
 
@@ -106,6 +111,9 @@ See diagram: [diagrams/component-vuln-change-monitor.puml](diagrams/component-vu
 
 - GET `/snapshots/<job_id>/result`
   - Response: `200` with stored async result object
+
+- GET `/health`
+  - Response: `200` when DB connectivity check succeeds, else `500`
 
 - GET `/products/<product_name>/versions/<product_version>/snapshots`
   - Query: `limit`, `offset`
@@ -143,14 +151,20 @@ Error shape:
   - Snapshot metadata and summary counts
   - Self-reference to previous snapshot
   - Unique constraint on `(product_name, product_version, source, snapshot_time)`
+  - Indexed columns for `product_name`, `product_version`, `source`, `snapshot_time`
+  - Non-negative check constraints for finding/summary counters
 
 - `vulnerability_findings`
   - Findings belonging to a snapshot
   - Unique finding key per snapshot on `(snapshot_id, vulnerability_id, component_name, component_version)`
+  - Enum constraints for `severity` and `affected_status`
+  - Optional risk fields `epss_score`, `known_exploited`
 
 - `vulnerability_changes`
   - Materialized delta rows between previous and current snapshots
   - Includes prior/current severity, CVSS, affected status
+  - Tracks `cvss_changed` as first-class change type
+  - FK cascade from `snapshot_id` and `previous_snapshot_id`
 
 See diagram: [diagrams/erd-vuln-change-monitor.puml](diagrams/erd-vuln-change-monitor.puml)
 
@@ -206,19 +220,21 @@ See diagram: [diagrams/deployment-vuln-change-monitor.puml](diagrams/deployment-
 ## 9. Requirements Traceability (Inferred)
 
 - REQ-01: Accept vulnerability snapshot payloads
-  - Evidence: `app/vulnerability_api.py`, `app/vulnerability_service.py: create_snapshot`
+  - Evidence: `app/api/vulnerability_api.py`, `app/service/vulnerability_service.py: create_snapshot`
 - REQ-02: Enforce payload validation rules and enums
-  - Evidence: `app/vulnerability_service.py: normalize_snapshot_input`
+  - Evidence: `app/service/vulnerability_service.py: normalize_snapshot_input`
 - REQ-03: Compute changes against previous snapshot
-  - Evidence: `app/vulnerability_service.py: compare_snapshots`
+  - Evidence: `app/service/vulnerability_service.py: compare_snapshots`
 - REQ-04: Persist snapshots, findings, and changes
-  - Evidence: `app/models.py`, `app/vulnerability_service.py: create_snapshot`
+  - Evidence: `app/db/models.py`, `app/service/vulnerability_service.py: create_snapshot`
 - REQ-05: Support idempotent behavior via key
-  - Evidence: `app/vulnerability_api.py`, `app/vulnerability_service.py`
+  - Evidence: `app/api/vulnerability_api.py`, `app/service/vulnerability_service.py`
 - REQ-06: Support async snapshot processing and polling
-  - Evidence: `app/vulnerability_service.py: submit_snapshot/get_snapshot_status/get_snapshot_result`
+  - Evidence: `app/service/vulnerability_service.py: submit_snapshot/get_snapshot_status/get_snapshot_result`
 - REQ-07: Expose health endpoint with DB connectivity check
   - Evidence: `app/__init__.py: /health`
+- REQ-08: Provide machine-readable API spec and Swagger UI
+  - Evidence: `docs/api/swagger.yaml`, `app/__init__.py: Swagger(app, template=template)`
 
 ---
 
@@ -231,9 +247,9 @@ See diagram: [diagrams/deployment-vuln-change-monitor.puml](diagrams/deployment-
 - Performance
   - Threaded Flask and async thread path reduce request wait for heavy snapshot processing
 - Data Integrity
-  - Unique constraints on snapshot identity and per-snapshot finding identity
+  - Unique/check constraints, enum-typed status/severity fields, and FK cascade rules protect consistency
 - Operability
-  - Migrations applied on startup in container command
+  - Migrations applied on startup in container command and API schema exposed through Swagger UI
 
 ---
 

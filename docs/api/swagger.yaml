@@ -2,11 +2,11 @@ openapi: 3.0.0
 
 info:
   title: Vulnerability Snapshot API
-  version: 1.0.0
+  version: 1.1.0
   description: API for managing vulnerability snapshots and changes
 
 servers:
-  - url: http://localhost:5000
+  - url: http://localhost:8080
 
 paths:
 
@@ -64,6 +64,8 @@ paths:
                 properties:
                   job_id:
                     type: string
+        "400":
+          description: Validation error
 
   /snapshots/{job_id}/status:
     get:
@@ -85,6 +87,8 @@ paths:
                   status:
                     type: string
                     example: completed
+        "404":
+          description: Job not found
 
   /snapshots/{job_id}/result:
     get:
@@ -101,7 +105,14 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SnapshotResponse"
+                oneOf:
+                  - $ref: "#/components/schemas/SnapshotResponse"
+                  - type: object
+                    properties:
+                      error:
+                        type: string
+        "404":
+          description: Job not found
 
   /products/{product_name}/versions/{product_version}/snapshots:
     get:
@@ -207,13 +218,48 @@ paths:
                       $ref: "#/components/schemas/Change"
                   limit:
                     type: integer
+                    nullable: true
                   offset:
                     type: integer
+                    nullable: true
+        "404":
+          description: Snapshot not found
+
+  /health:
+    get:
+      summary: Health check with DB connectivity probe
+      responses:
+        "200":
+          description: Service and DB are reachable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+        "500":
+          description: DB connectivity failed
 
 
 components:
 
   schemas:
+
+    SnapshotSummary:
+      type: object
+      properties:
+        new:
+          type: integer
+        resolved:
+          type: integer
+        severity_changed:
+          type: integer
+        status_changed:
+          type: integer
+        unchanged:
+          type: integer
 
     SnapshotRequest:
       type: object
@@ -279,19 +325,9 @@ components:
           type: string
         previous_snapshot_id:
           type: string
+          nullable: true
         summary:
-          type: object
-          properties:
-            new:
-              type: integer
-            resolved:
-              type: integer
-            severity_changed:
-              type: integer
-            status_changed:
-              type: integer
-            unchanged:
-              type: integer
+          $ref: "#/components/schemas/SnapshotSummary"
 
     SnapshotListItem:
       type: object
@@ -324,14 +360,16 @@ components:
           type: integer
         previous_snapshot_id:
           type: string
+          nullable: true
         summary:
-          $ref: "#/components/schemas/SnapshotResponse/properties/summary"
+          $ref: "#/components/schemas/SnapshotSummary"
 
     Change:
       type: object
       properties:
         change_type:
           type: string
+          enum: [new, resolved, severity_changed, status_changed, cvss_changed]
         vulnerability_id:
           type: string
         component_name:
@@ -345,5 +383,7 @@ components:
           enum: [escalated, de_escalated, unchanged, null]
         previous:
           type: object
+          nullable: true
         current:
           type: object
+          nullable: true

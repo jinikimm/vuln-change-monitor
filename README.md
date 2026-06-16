@@ -2,6 +2,11 @@
 
 Flask service that stores vulnerability snapshots, compares each new snapshot with the previous one, and exposes change results.
 
+Current package layout:
+- app/api
+- app/service
+- app/db
+
 ## 1) Build and run locally
 
 Prerequisites:
@@ -56,7 +61,7 @@ curl "http://localhost:8080/snapshots/<snapshot_id>/changes?change_type=severity
 
 Variables used by app:
 - DB_HOST: localhost
-- DB_PORT: 5432
+- DB_PORT: 5433
 - DB_NAME: vuln_db
 - DB_USER: vuln_user
 - DB_PASSWORD: vuln_pass
@@ -79,7 +84,7 @@ If you only need quick local testing, tests use in-memory SQLite and do not requ
 
 ## 5) Run tests
 
-#### Functional tests are in tests/test_vulnerability_api.py.
+#### Functional tests are in tests/api_test/test_vulnerability_api.py.
 
 To run functional tests:
 
@@ -136,6 +141,10 @@ Async snapshot API:
 - GET /snapshots/{job_id}/status returns processing/completed/failed
 - GET /snapshots/{job_id}/result returns snapshot result or error
 
+API docs:
+- OpenAPI source: docs/api/swagger.yaml
+- Swagger UI (Flasgger): /apidocs
+
 ## 8) Assumptions and shortcuts
 
 - Single service process, async snapshot is handled by in-process thread (no external queue/worker).
@@ -145,9 +154,9 @@ Async snapshot API:
 - Optional finding fields epss_score (0.0 to 1.0) and known_exploited (boolean) are supported.
 
 ## 9) Improvements with more time
-- OpenAPI / Swagger specification.
+- Ensure more detailed exception handling
 
-## 10) Bonus updates in this iteration
+## 10) Bonus updates
 
 - Added idempotency support with Idempotency-Key for sync and async snapshot submission.
 - Added async snapshot processing endpoints (submit/status/result).
@@ -157,3 +166,5 @@ Async snapshot API:
 - Added live integration API tests for running environment.
 - Added severity ordering helpers for escalation/de-escalation reporting.
 - Added database transaction handling that guarantees data are committed atomically.
+- Added OpenAPI specification at docs/api/swagger.yaml and integrated Flasgger UI.
+- Refined DB schema using enums, FK cascade rules, and snapshot metadata indexes.
