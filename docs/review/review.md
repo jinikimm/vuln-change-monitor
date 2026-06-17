@@ -84,3 +84,17 @@
 - N.A
 
 ---
+
+### 4. API Routing
+
+**Q. Why use Flask Blueprint? What are alternatives?**
+
+**Answer**
+- Blueprint is used to modularize and group routes, and here it is combined with API classes to centralize routing logic.
+
+**Action**
+- Refactor API routing by adopting PSA's class-based API pattern with centralized route registration.
+
+**Updates**
+- [app/api/](https://github.com/jinikimm/vuln-change-monitor/tree/main/app/api) ([99ad20a
+](https://github.com/jinikimm/vuln-change-monitor/commit/99ad20a8f508520ac49e9a7537dbc905c99e6bb8) ) : Refactored API routing to class-based structure with centralized add_url_rules() registration for consistency.
