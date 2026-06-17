@@ -9,8 +9,7 @@ from sqlalchemy import text
 from .error_handler import error_handlers
 from .logger import init_logger
 from .db.models import db
-from .api.vulnerability_api import vulnerability_bp
-
+from .api import register_apis
 
 def create_app(test_config=None):
     app = Flask(__name__, instance_relative_config=True)
@@ -25,7 +24,7 @@ def create_app(test_config=None):
     db.init_app(app)
     Migrate(app, db)
 
-    app.register_blueprint(vulnerability_bp)
+    register_apis(app)
     error_handlers(app)
     init_logger(app)
 
