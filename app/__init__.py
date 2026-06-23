@@ -6,10 +6,6 @@ from flask import Flask
 from flask_migrate import Migrate
 from sqlalchemy import text
 
-from .error_handler import error_handlers
-from .logger import init_logger
-from .db.models import db
-from .api import register_apis
 
 def create_app(test_config=None):
     app = Flask(__name__, instance_relative_config=True)
@@ -21,12 +17,18 @@ def create_app(test_config=None):
 
     os.makedirs(app.instance_path, exist_ok=True)
 
+    from .db.models import db
     db.init_app(app)
     Migrate(app, db)
 
-    register_apis(app)
-    error_handlers(app)
+    from .logger import init_logger
     init_logger(app)
+
+    from .error_handler import error_handlers
+    error_handlers(app)
+
+    from .api import register_apis
+    register_apis(app)
 
     with open("docs/api/swagger.yaml") as f:
         template = yaml.safe_load(f)
