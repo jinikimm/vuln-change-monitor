@@ -1,0 +1,24 @@
+{
+  "product_name": "demo-app-async",
+  "product_version": "2.0.0",
+  "source": "nvd-async",
+  "snapshot_time": "2025-02-01T00:00:00Z",
+  "findings": [
+    {
+      "vulnerability_id": "CVE-2024-2001",
+      "component_name": "nginx",
+      "component_version": "1.26.0",
+      "severity": "medium",
+      "cvss_score": 6.1,
+      "affected_status": "affected"
+    },
+    {
+      "vulnerability_id": "CVE-2024-2002",
+      "component_name": "libxml2",
+      "component_version": "2.11.7",
+      "severity": "low",
+      "cvss_score": 3.7,
+      "affected_status": "affected"
+    }
+  ]
+}

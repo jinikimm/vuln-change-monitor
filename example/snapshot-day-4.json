@@ -1,0 +1,24 @@
+{
+  "product_name": "demo-app-async",
+  "product_version": "2.0.0",
+  "source": "nvd-async",
+  "snapshot_time": "2025-02-02T00:00:00Z",
+  "findings": [
+    {
+      "vulnerability_id": "CVE-2024-2001",
+      "component_name": "nginx",
+      "component_version": "1.26.0",
+      "severity": "high",
+      "cvss_score": 7.8,
+      "affected_status": "fixed"
+    },
+    {
+      "vulnerability_id": "CVE-2024-2003",
+      "component_name": "sqlite",
+      "component_version": "3.45.1",
+      "severity": "medium",
+      "cvss_score": 5.9,
+      "affected_status": "affected"
+    }
+  ]
+}
