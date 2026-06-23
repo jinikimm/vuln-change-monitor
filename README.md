@@ -43,17 +43,41 @@ compose app startup command runs DB migration first:
 ### Example usage
 
 ```bash
-curl -X POST http://localhost:8080/snapshots \
--H "Content-Type: application/json" \
--d @example/snapshot-day-1.json
 
-curl -X POST http://localhost:8080/snapshots \
--H "Content-Type: application/json" \
--d @example/snapshot-day-2.json
+# Synchronous processing
+curl -s -X POST http://localhost:8080/snapshots \
+	-H "Content-Type: application/json" \
+	-d @example/snapshot-day-1.json
+
+curl -s -X POST http://localhost:8080/snapshots \
+	-H "Content-Type: application/json" \
+	-d @example/snapshot-day-2.json
+
+
+# Asynchronous processing
+curl -s -X POST http://localhost:8080/snapshots/async \
+	-H "Content-Type: application/json" \
+	-d @example/snapshot-day-3.json
+
+curl -s -X POST http://localhost:8080/snapshots/async \
+	-H "Content-Type: application/json" \
+	-d @example/snapshot-day-4.json
+
+curl http://localhost:8080/snapshots/<snapshot_id>/status
+curl http://localhost:8080/snapshots/<snapshot_id>/result
+
+
+# get snapshot change results
+
+curl http://localhost:8080/snapshots/<snapshot_id>
 
 curl http://localhost:8080/snapshots/<snapshot_id>/changes
+curl http://localhost:8080/snapshots/<snapshot_id>/changes?change_type=severity_changed&limit=20&offset=0
+curl http://localhost:8080/snapshots/<snapshot_id>/changes?severity=critical
+curl http://localhost:8080/snapshots/<snapshot_id>/changes?component_name=openssl
 
-curl "http://localhost:8080/snapshots/<snapshot_id>/changes?change_type=severity_changed&limit=20&offset=0"
+curl http://localhost:8080/products/demo-app/versions/1.0.0/snapshots?limit=10&offset=0
+
 ```
 
 
